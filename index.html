@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Drag and Drop Sorter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .item {
+            touch-action: none; /* Prevents browser from handling touch events like scrolling */
+        }
+        .drop-area {
+            min-height: 200px;
+            transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+        }
+        .dragging {
+            opacity: 0.5;
+            transform: scale(1.05);
+        }
+        .drag-over {
+            background-color: #eef2ff; /* indigo-100 */
+            border-color: #6366f1; /* indigo-500 */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 flex flex-col items-center justify-center min-h-screen p-4 md:p-6">
+
+    <div class="w-full max-w-4xl mx-auto">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Drag & Drop Sorter</h1>
+            <p class="text-gray-600 mt-2">Move the items from the list below into the correct boxes.</p>
+        </div>
+
+        <div class="flex flex-col gap-8">
+            
+            <!-- Drop Areas -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                <!-- Area 1 -->
+                <div class="bg-white p-6 rounded-2xl shadow-md border border-gray-200 flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-semibold text-gray-700">Box 1</h2>
+                        <div class="text-2xl font-bold bg-gray-200 text-gray-800 px-4 py-1 rounded-lg">
+                            <span id="counter1">0</span>
+                        </div>
+                    </div>
+                    <div id="area1" class="drop-area bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-4 flex-grow flex flex-wrap content-start gap-3">
+                        <!-- Dropped items will appear here -->
+                    </div>
+                </div>
+
+                <!-- Area 2 -->
+                <div class="bg-white p-6 rounded-2xl shadow-md border border-gray-200 flex flex-col">
+                     <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-semibold text-gray-700">Box 2</h2>
+                        <div class="text-2xl font-bold bg-gray-200 text-gray-800 px-4 py-1 rounded-lg">
+                            <span id="counter2">0</span>
+                        </div>
+                    </div>
+                    <div id="area2" class="drop-area bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-4 flex-grow flex flex-wrap content-start gap-3">
+                        <!-- Dropped items will appear here -->
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Items Pool -->
+            <div id="items-pool-container" class="w-full bg-white p-6 rounded-2xl shadow-md border border-gray-200">
+                <h2 class="text-2xl font-semibold mb-4 text-center text-gray-800">Choose From Here</h2>
+                <div id="items-pool" class="drop-area flex flex-wrap justify-center gap-3 p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 min-h-[100px]">
+                    <!-- Items will be injected here by JavaScript -->
+                </div>
+            </div>
+        </div>
+        <div class="text-center mt-8">
+             <button id="resetButton" class="bg-gray-600 text-white font-semibold py-2 px-6 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition duration-150 ease-in-out">
+                Reset
+            </button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const itemsList = [
+                'Car', 'Dog', 'Elephant', 'Bicycle', 'Airplane', 
+                'Tiger', 'Train', 'Ship', 'Fish', 'Cat', 'Lion'
+            ];
+
+            const itemsPool = document.getElementById('items-pool');
+            const dropAreas = document.querySelectorAll('.drop-area');
+            const resetButton = document.getElementById('resetButton');
+
+            let draggedItem = null;
+            let lastOverElement = null;
+
+            // --- Initialization ---
+            function initializeItems() {
+                // Clear all areas before re-initializing
+                document.getElementById('area1').innerHTML = '';
+                document.getElementById('area2').innerHTML = '';
+                itemsPool.innerHTML = ''; 
+
+                itemsList.forEach(itemName => {
+                    const item = document.createElement('div');
+                    item.id = `item-${itemName.toLowerCase()}`;
+                    item.draggable = true;
+                    item.className = 'item bg-white cursor-grab select-none p-3 rounded-lg shadow-sm border border-gray-200 hover:shadow-md hover:border-indigo-400 transition-all';
+                    item.textContent = itemName;
+                    itemsPool.appendChild(item);
+                });
+                addDragAndTouchListeners();
+                updateCounters();
+            }
+
+            // --- Counter Logic ---
+            function updateCounters() {
+                const counter1 = document.getElementById('counter1');
+                const counter2 = document.getElementById('counter2');
+                const area1 = document.getElementById('area1');
+                const area2 = document.getElementById('area2');
+
+                counter1.textContent = area1.children.length;
+                counter2.textContent = area2.children.length;
+            }
+
+            // --- Event Listener Setup ---
+            function addDragAndTouchListeners() {
+                const items = document.querySelectorAll('.item');
+                items.forEach(item => {
+                    // Mouse Events
+                    item.addEventListener('dragstart', handleDragStart);
+                    item.addEventListener('dragend', handleDragEnd);
+                    
+                    // Touch Events
+                    item.addEventListener('touchstart', handleTouchStart, { passive: false });
+                });
+
+                // Add touch listeners to the whole document to track movement and release
+                document.addEventListener('touchmove', handleTouchMove, { passive: false });
+                document.addEventListener('touchend', handleTouchEnd);
+            }
+            
+            // --- MOUSE Drag Handlers ---
+            function handleDragStart(e) {
+                draggedItem = e.target;
+                e.dataTransfer.setData('text/plain', e.target.id);
+                setTimeout(() => {
+                    e.target.classList.add('dragging');
+                }, 0);
+            }
+
+            function handleDragEnd(e) {
+                if (draggedItem) {
+                    draggedItem.classList.remove('dragging');
+                }
+                draggedItem = null;
+            }
+
+            dropAreas.forEach(area => {
+                area.addEventListener('dragover', handleDragOver);
+                area.addEventListener('dragleave', handleDragLeave);
+                area.addEventListener('drop', handleDrop);
+            });
+
+            function handleDragOver(e) {
+                e.preventDefault();
+                if (e.currentTarget.classList.contains('drop-area')) {
+                    e.currentTarget.classList.add('drag-over');
+                }
+            }
+
+            function handleDragLeave(e) {
+                if (e.currentTarget.classList.contains('drop-area')) {
+                    e.currentTarget.classList.remove('drag-over');
+                }
+            }
+
+            function handleDrop(e) {
+                e.preventDefault();
+                if (e.currentTarget.classList.contains('drop-area')) {
+                    e.currentTarget.classList.remove('drag-over');
+                }
+                const id = e.dataTransfer.getData('text');
+                const draggableElement = document.getElementById(id);
+                if (e.currentTarget.contains(draggableElement)) return;
+                e.currentTarget.appendChild(draggableElement);
+                updateCounters();
+            }
+
+            // --- TOUCH Handlers ---
+            function handleTouchStart(e) {
+                e.preventDefault(); // Prevent page scrolling
+                draggedItem = e.target;
+                draggedItem.classList.add('dragging');
+            }
+
+            function handleTouchMove(e) {
+                if (!draggedItem) return;
+                e.preventDefault();
+
+                // Find the element under the user's finger
+                const touch = e.touches[0];
+                const elementBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+                const dropArea = elementBelow ? elementBelow.closest('.drop-area') : null;
+
+                // Remove highlight from the previous drop area
+                if (lastOverElement && lastOverElement !== dropArea) {
+                    lastOverElement.classList.remove('drag-over');
+                }
+
+                // Add highlight to the new drop area
+                if (dropArea) {
+                    dropArea.classList.add('drag-over');
+                    lastOverElement = dropArea;
+                } else {
+                    lastOverElement = null;
+                }
+            }
+
+            function handleTouchEnd(e) {
+                if (!draggedItem) return;
+
+                // If we are over a valid drop area, drop the item
+                if (lastOverElement) {
+                    lastOverElement.classList.remove('drag-over');
+                    if (!lastOverElement.contains(draggedItem)) {
+                        lastOverElement.appendChild(draggedItem);
+                        updateCounters();
+                    }
+                }
+                
+                // Cleanup
+                draggedItem.classList.remove('dragging');
+                draggedItem = null;
+                lastOverElement = null;
+            }
+
+            // --- Reset ---
+            resetButton.addEventListener('click', initializeItems);
+
+            // --- Initial Load ---
+            initializeItems();
+        });
+    </script>
+</body>
+</html>
+
